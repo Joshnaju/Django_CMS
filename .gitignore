@@ -1,0 +1,5 @@
+myvirtualenv/
+__pycache__/
+*.pyc
+.env
+cms.sqlite3
