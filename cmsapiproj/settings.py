@@ -41,7 +41,9 @@ INSTALLED_APPS = [
     'rest_framework',
     'accounts',
     'doctor',
-    'departments'
+    'departments',
+    'lab_master',
+    'medicine_master',
 ]
 
 MIDDLEWARE = [
