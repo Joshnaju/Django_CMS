@@ -1,7 +1,6 @@
 from rest_framework import serializers
-from datetime import date
-from .models import Patient
-
+from datetime import date, timedelta
+from .models import Patient, Appointment
 
 class PatientSerializer(serializers.ModelSerializer):
 
@@ -93,3 +92,78 @@ class PatientSerializer(serializers.ModelSerializer):
         return address
 
 
+class AppointmentSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Appointment
+        fields = '__all__'
+        read_only_fields = [
+            'token_number',
+            'created_at',
+            'updated_at',
+        ]
+
+    def validate(self, data):
+        today = date.today()
+
+        appointment_type = data.get('appointment_type')
+        appointment_date = data.get('appointment_date')
+        patient = data.get('patient')
+        doctor = data.get('doctor')
+        appointment_time = data.get('appointment_time')
+
+        # Patient must be active
+        if patient and not patient.is_active:
+            raise serializers.ValidationError({
+                "patient": "Cannot create an appointment for an inactive patient."
+            })
+
+        # Appointment cannot be in the past
+        if appointment_date and appointment_date < today:
+            raise serializers.ValidationError({
+                "appointment_date":
+                "Appointment cannot be scheduled for a past date."
+            })
+
+        # Walk-in appointments are only for today
+        if appointment_type == 'WALK_IN':
+            if appointment_date != today:
+                raise serializers.ValidationError({
+                    "appointment_date":
+                    "Walk-in appointment must be for today."
+                })
+
+        # Prior booking must be at least 2 days in advance
+        if appointment_type == 'PRIOR_BOOKING':
+            minimum_date = today + timedelta(days=2)
+
+            if appointment_date < minimum_date:
+                raise serializers.ValidationError({
+                    "appointment_date":
+                    "Prior booking must be made at least 2 days in advance."
+                })
+
+        # Prevent duplicate doctor appointment slot
+        if doctor and appointment_date and appointment_time:
+            existing_appointment = Appointment.objects.filter(
+                doctor=doctor,
+                appointment_date=appointment_date,
+                appointment_time=appointment_time
+            )
+
+            # While updating an appointment,
+            # ignore the current appointment itself
+            if self.instance:
+                existing_appointment = existing_appointment.exclude(
+                    pk=self.instance.pk
+                )
+
+            if existing_appointment.exists():
+                raise serializers.ValidationError({
+                    "appointment_time":
+                    "This doctor already has an appointment at this date and time."
+                })
+
+        return data
+
+    
