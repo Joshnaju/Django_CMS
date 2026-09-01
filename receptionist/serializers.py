@@ -208,3 +208,45 @@ class ConsultationBillSerializer(serializers.ModelSerializer):
         return bill
 
 
+# FOR DOCTOR MODULE
+class DoctorAppointmentSerializer(serializers.ModelSerializer):
+
+    patient_id = serializers.CharField(
+        source="patient.patient_id",
+        read_only=True
+    )
+
+    patient_name = serializers.CharField(
+        source="patient.patient_name",
+        read_only=True
+    )
+
+    doctor_name = serializers.CharField(
+        source="doctor.user_profile.name",
+        read_only=True
+    )
+
+    class Meta:
+        model = Appointment
+        fields = [
+            "id",
+            "patient_id",
+            "patient_name",
+            "doctor_name",
+            "appointment_type",
+            "appointment_date",
+            "appointment_time",
+            "token_number",
+            "status",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "patient_id",
+            "patient_name",
+            "doctor_name",
+            "token_number",
+            "created_at",
+            "updated_at",
+        ]
