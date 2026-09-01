@@ -5,6 +5,8 @@ from rest_framework.decorators import action
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 
+from accounts.permissions import IsDoctor
+
 from .models import Patient, Appointment, ConsultationBill
 from .serializers import (
     DoctorAppointmentSerializer,
@@ -73,7 +75,7 @@ class ConsultationBillViewSet(viewsets.ModelViewSet):
 class DoctorAppointmentViewSet(viewsets.ReadOnlyModelViewSet):
 
     serializer_class = DoctorAppointmentSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated,IsDoctor]
 
 
     def get_queryset(self):
