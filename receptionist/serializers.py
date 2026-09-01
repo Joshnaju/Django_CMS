@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from datetime import date, timedelta
-from .models import Patient, Appointment
+from .models import Patient, Appointment, ConsultationBill
 
 class PatientSerializer(serializers.ModelSerializer):
 
@@ -166,4 +166,45 @@ class AppointmentSerializer(serializers.ModelSerializer):
 
         return data
 
-    
+
+class ConsultationBillSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = ConsultationBill
+        fields = '__all__'
+        read_only_fields = [
+            'registration_fee',
+            'consultation_fee',
+            'total_amount',
+            'created_at',
+        ]
+
+    def create(self, validated_data):
+        appointment = validated_data['appointment']
+
+        patient = appointment.patient
+        doctor = appointment.doctor
+
+        consultation_fee = doctor.consultation_fee
+
+        previous_bills = ConsultationBill.objects.filter(
+            appointment__patient=patient
+        ).exists()
+
+        if previous_bills:
+            registration_fee = 0
+        else:
+            registration_fee = 100
+
+        total_amount = registration_fee + consultation_fee
+
+        bill = ConsultationBill.objects.create(
+            appointment=appointment,
+            registration_fee=registration_fee,
+            consultation_fee=consultation_fee,
+            total_amount=total_amount
+        )
+
+        return bill
+
+

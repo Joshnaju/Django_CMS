@@ -2,8 +2,12 @@
 
 from rest_framework import viewsets
 
-from .models import Patient, Appointment
-from .serializers import PatientSerializer, AppointmentSerializer
+from .models import Patient, Appointment, ConsultationBill
+from .serializers import (
+    PatientSerializer,
+    AppointmentSerializer,
+    ConsultationBillSerializer,
+)
 
 
 class PatientViewSet(viewsets.ModelViewSet):
@@ -29,3 +33,10 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             'appointment_time',
             'token_number'
         )
+
+class ConsultationBillViewSet(viewsets.ModelViewSet):
+    queryset = ConsultationBill.objects.all()
+    serializer_class = ConsultationBillSerializer
+
+
+
