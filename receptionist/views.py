@@ -5,6 +5,8 @@ from rest_framework.decorators import action
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 
+from accounts.permissions import IsDoctor
+
 from .models import Patient, Appointment, ConsultationBill
 from .serializers import (
     DoctorAppointmentSerializer,
@@ -18,8 +20,7 @@ from .permissions import IsReceptionist
 class PatientViewSet(viewsets.ModelViewSet):
     queryset = Patient.objects.all()
     serializer_class = PatientSerializer
-    # permission_classes = [IsAuthenticated, IsReceptionist]
-    permission_classes = []
+    permission_classes = [IsAuthenticated, IsReceptionist]
 
 
     def get_queryset(self):
@@ -44,8 +45,7 @@ class PatientViewSet(viewsets.ModelViewSet):
 class AppointmentViewSet(viewsets.ModelViewSet):
     queryset = Appointment.objects.all()
     serializer_class = AppointmentSerializer
-    # permission_classes = [IsAuthenticated, IsReceptionist]
-    permission_classes = []
+    permission_classes = [IsAuthenticated, IsReceptionist]
 
 
     def get_queryset(self):
@@ -68,16 +68,14 @@ class AppointmentViewSet(viewsets.ModelViewSet):
 class ConsultationBillViewSet(viewsets.ModelViewSet):
     queryset = ConsultationBill.objects.all()
     serializer_class = ConsultationBillSerializer
-    # permission_classes = [IsAuthenticated, IsReceptionist]
-    permission_classes = []
+    permission_classes = [IsAuthenticated, IsReceptionist]
 
 
 # FOR DOCTOR MODULE
 class DoctorAppointmentViewSet(viewsets.ReadOnlyModelViewSet):
 
     serializer_class = DoctorAppointmentSerializer
-    permission_classes = [IsAuthenticated]
-    # permission_classes = []
+    permission_classes = [IsAuthenticated,IsDoctor]
 
 
     def get_queryset(self):
