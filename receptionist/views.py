@@ -1,8 +1,15 @@
+from datetime import timezone
+
+
+from rest_framework.decorators import action
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 
+from accounts.permissions import IsDoctor
+
 from .models import Patient, Appointment, ConsultationBill
 from .serializers import (
+    DoctorAppointmentSerializer,
     PatientSerializer,
     AppointmentSerializer,
     ConsultationBillSerializer,
@@ -14,6 +21,7 @@ class PatientViewSet(viewsets.ModelViewSet):
     queryset = Patient.objects.all()
     serializer_class = PatientSerializer
     permission_classes = [IsAuthenticated, IsReceptionist]
+
 
     def get_queryset(self):
         queryset = Patient.objects.all()
@@ -39,6 +47,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
     serializer_class = AppointmentSerializer
     permission_classes = [IsAuthenticated, IsReceptionist]
 
+
     def get_queryset(self):
         queryset = Appointment.objects.all()
 
@@ -62,3 +71,54 @@ class ConsultationBillViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsReceptionist]
 
 
+# FOR DOCTOR MODULE
+class DoctorAppointmentViewSet(viewsets.ReadOnlyModelViewSet):
+
+    serializer_class = DoctorAppointmentSerializer
+    permission_classes = [IsAuthenticated,IsDoctor]
+
+
+    def get_queryset(self):
+        return Appointment.objects.filter(
+            doctor__user_profile__user=self.request.user
+        ).select_related(
+            "patient",
+            "doctor",
+            "doctor__user_profile",
+        ).order_by(
+            "appointment_date",
+            "appointment_time",
+        )
+    
+    @action(detail=False, methods=["get"])
+    def today(self, request):
+
+        today = timezone.localdate()
+
+        appointments = self.get_queryset().filter(
+            appointment_date=today
+        )
+
+        serializer = self.get_serializer(
+            appointments,
+            many=True
+        )
+
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["get"])
+    def upcoming(self, request):
+
+        today = timezone.localdate()
+
+        appointments = self.get_queryset().filter(
+            appointment_date__gte=today,
+            status="SCHEDULED",
+        )
+
+        serializer = self.get_serializer(
+            appointments,
+            many=True
+        )
+
+        return Response(serializer.data)
