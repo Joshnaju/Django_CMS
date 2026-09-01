@@ -10,4 +10,6 @@ urlpatterns = [
     path("api/lab-master/",include("lab_master.urls")),
     path("api/medicine-master/",include("medicine_master.urls")),
     path("api/pharmacy/", include("pharmacy.urls")),
+
+    path('api/receptionist/',include('receptionist.urls'))
 ]
