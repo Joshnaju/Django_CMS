@@ -8,5 +8,7 @@ urlpatterns = [
     path('api/accounts/', include('accounts.urls')),
     path("api/token/refresh/",TokenRefreshView.as_view(),name="token_refresh"),
     path("api/lab-master/",include("lab_master.urls")),
-    path("api/medicine-master/",include("medicine_master.urls"))
+    path("api/medicine-master/",include("medicine_master.urls")),
+
+    path('api/receptionist/',include('receptionist.urls'))
 ]
