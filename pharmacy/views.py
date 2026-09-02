@@ -48,7 +48,7 @@ def medicine_details(request, medicine_id):
         medicine=medicine
     ).first()
 
-    # GET → View medicine details
+    # ---------------- GET ----------------
     if request.method == "GET":
 
         data = {
@@ -70,7 +70,7 @@ def medicine_details(request, medicine_id):
 
         return Response(data)
 
-    # PUT / PATCH → Update details
+    # ---------------- UPDATE MEDICINE ----------------
 
     medicine_fields = [
         "name",
@@ -84,6 +84,7 @@ def medicine_details(request, medicine_id):
     for field in medicine_fields:
 
         if field in request.data:
+
             setattr(
                 medicine,
                 field,
@@ -92,47 +93,88 @@ def medicine_details(request, medicine_id):
 
     medicine.save()
 
+    # ---------------- INVENTORY FIELDS ----------------
+
     inventory_fields = [
-    "stock",
-    "batch_number",
-    "manufacturing_date",
-    "expiry_date",
-    "number_of_units",
-]
+        "stock",
+        "batch_number",
+        "manufacturing_date",
+        "expiry_date",
+        "number_of_units",
+    ]
 
+    inventory_data = {}
 
-    # If inventory already exists, update it
+    for field in inventory_fields:
+
+        if field in request.data:
+
+            inventory_data[field] = request.data[field]
+
+    # ---------------- UPDATE EXISTING INVENTORY ----------------
+
     if inventory:
 
-        for field in inventory_fields:
+        if inventory_data:
 
-            if field in request.data:
-                setattr(
-                    inventory,
-                    field,
-                    request.data[field]
-                )
+            serializer = MedicineInventorySerializer(
+                inventory,
+                data=inventory_data,
+                partial=True
+            )
 
-        inventory.save()
+            serializer.is_valid(
+                raise_exception=True
+            )
 
+            serializer.save()
 
-    # If inventory does not exist, create it
+    # ---------------- CREATE NEW INVENTORY ----------------
+
     else:
 
-        inventory_data = {}
+        if inventory_data:
 
-        for field in inventory_fields:
+            required_fields = [
+                "stock",
+                "batch_number",
+                "manufacturing_date",
+                "expiry_date",
+                "number_of_units",
+            ]
 
-            if field in request.data:
-                inventory_data[field] = request.data[field]
+            missing_fields = []
 
-    # Create inventory only if pharmacy details are sent
-    if inventory_data:
+            for field in required_fields:
 
-        MedicineInventory.objects.create(
-            medicine=medicine,
-            **inventory_data
-        )
+                if field not in inventory_data:
+
+                    missing_fields.append(field)
+
+            if missing_fields:
+
+                return Response(
+                    {
+                        "detail":
+                        "All inventory fields are required when creating inventory.",
+
+                        "missing_fields":
+                        missing_fields
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            serializer = MedicineInventorySerializer(
+                data=inventory_data
+            )
+
+            serializer.is_valid(
+                raise_exception=True
+            )
+
+            serializer.save(
+                medicine=medicine
+            )
 
     return Response({
         "message": "Medicine details updated successfully.",
