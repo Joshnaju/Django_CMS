@@ -1,12 +1,13 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from medicine_master.models import Medicine
 
 from .models import MedicineInventory
 from .serializers import MedicineInventorySerializer
+from .permissions import IsPharmacist
 
 
 class MedicineInventoryViewSet(viewsets.ModelViewSet):
@@ -17,7 +18,7 @@ class MedicineInventoryViewSet(viewsets.ModelViewSet):
 
     serializer_class = MedicineInventorySerializer
 
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated,IsPharmacist]
 
     http_method_names = [
         "get",
@@ -30,7 +31,7 @@ class MedicineInventoryViewSet(viewsets.ModelViewSet):
 
 
 @api_view(["GET", "PUT", "PATCH"])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated,IsPharmacist])
 def medicine_details(request, medicine_id):
 
     try:
