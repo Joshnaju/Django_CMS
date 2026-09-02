@@ -68,7 +68,15 @@ class MedicinePrescription(models.Model):
     medicine = models.ForeignKey(
         "medicine_master.Medicine",
         on_delete=models.PROTECT,
-        related_name="medicine_prescriptions"
+        related_name="medicine_prescriptions",
+        null=True,       
+        blank=True   
+    )
+
+    medicine_name = models.CharField(
+        max_length=150,
+        blank=True,
+        null=True
     )
 
     dosage = models.CharField(
@@ -93,10 +101,9 @@ class MedicinePrescription(models.Model):
 
     def __str__(self):
         return (
-            f"{self.medicine.name} - "
+            f"{self.medicine.name if self.medicine else self.medicine_name} - "
             f"{self.consultation.appointment.patient.patient_id}"
-        )
-
+            )
 class LabOrder(models.Model):
 
     consultation = models.ForeignKey(
@@ -108,7 +115,15 @@ class LabOrder(models.Model):
     lab_test = models.ForeignKey(
         "lab_master.LabTest",
         on_delete=models.PROTECT,
-        related_name="lab_orders"
+        related_name="lab_orders",
+        null=True,      
+        blank=True 
+    )
+
+    lab_test_name = models.CharField(
+        max_length=150,
+        blank=True,
+        null=True
     )
 
     instructions = models.TextField(
