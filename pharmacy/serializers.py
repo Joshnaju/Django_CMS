@@ -1,6 +1,6 @@
 from rest_framework import serializers
-
-from .models import MedicineInventory
+from .models import (MedicineInventory,PharmacyBill,PharmacyBillItem)
+from doctor.models import MedicinePrescription
 
 
 class MedicineInventorySerializer(serializers.ModelSerializer):
@@ -121,3 +121,116 @@ class MedicineInventorySerializer(serializers.ModelSerializer):
             })
 
         return data
+
+class PharmacistPrescriptionSerializer(serializers.ModelSerializer):
+
+    # ---------------- PATIENT DETAILS ----------------
+
+    patient_id = serializers.CharField(
+        source="consultation.appointment.patient.patient_id",
+        read_only=True
+    )
+
+    patient_name = serializers.CharField(
+        source="consultation.appointment.patient.patient_name",
+        read_only=True
+    )
+
+    # ---------------- DOCTOR DETAILS ----------------
+
+    doctor_name = serializers.CharField(
+        source="consultation.appointment.doctor.user_profile.name",
+        read_only=True
+    )
+
+    # ---------------- MEDICINE DETAILS ----------------
+
+    medicine_name = serializers.CharField(
+        source="medicine.name",
+        read_only=True
+    )
+
+    class Meta:
+
+        model = MedicinePrescription
+
+        fields = [
+            "id",
+
+            "patient_id",
+            "patient_name",
+            "doctor_name",
+
+            "medicine",
+            "medicine_name",
+
+            "dosage",
+            "frequency",
+            "duration",
+            "instructions",
+        ]
+
+class PharmacyBillItemSerializer(serializers.ModelSerializer):
+
+    medicine_name = serializers.CharField(
+        source="medicine.name",
+        read_only=True
+    )
+
+    class Meta:
+
+        model = PharmacyBillItem
+
+        fields = [
+            "id",
+            "prescription",
+            "medicine",
+            "medicine_name",
+            "quantity",
+            "unit_price",
+            "total_price",
+        ]
+
+        read_only_fields = [
+            "medicine",
+            "unit_price",
+            "total_price",
+        ]
+
+
+class PharmacyBillSerializer(serializers.ModelSerializer):
+
+    patient_name = serializers.CharField(
+        source="patient.patient_name",
+        read_only=True
+    )
+
+    patient_id = serializers.CharField(
+        source="patient.patient_id",
+        read_only=True
+    )
+
+    items = PharmacyBillItemSerializer(
+        many=True,
+        read_only=True
+    )
+
+    class Meta:
+
+        model = PharmacyBill
+
+        fields = [
+            "id",
+            "patient",
+            "patient_id",
+            "patient_name",
+            "total_amount",
+            "payment_status",
+            "created_at",
+            "items",
+        ]
+
+        read_only_fields = [
+            "total_amount",
+            "created_at",
+        ]
