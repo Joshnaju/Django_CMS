@@ -54,16 +54,11 @@ class DoctorPatientViewSet(viewsets.ReadOnlyModelViewSet):
 
         return Response(serializer.data)
 
-class DoctorConsultationViewSet(
-    viewsets.ModelViewSet
-):
-
-    permission_classes = [IsAuthenticated,IsDoctor]
-
+class DoctorConsultationViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated, IsDoctor]
     serializer_class = ConsultationSerializer
 
     def get_queryset(self):
-
         return Consultation.objects.filter(
             appointment__doctor__user_profile__user=self.request.user
         ).select_related(
@@ -75,16 +70,33 @@ class DoctorConsultationViewSet(
             "medicine_prescriptions__medicine",
             "lab_orders",
             "lab_orders__lab_test",
-        ).order_by(
-            "-consultation_date"
-        )
+        ).order_by("-consultation_date")
+
+    @action(
+        detail=False,
+        methods=["get"],
+        url_path="by-appointment/(?P<appointment_id>[^/.]+)"
+    )
+    def by_appointment(self, request, appointment_id=None):
+
+        consultation = self.get_queryset().filter(
+            appointment_id=appointment_id
+        ).first()
+
+        if not consultation:
+            return Response(
+                {"detail": "Consultation not found."},
+                status=404
+            )
+
+        serializer = self.get_serializer(consultation)
+
+        return Response(serializer.data)
 
     def perform_create(self, serializer):
-
         appointment = serializer.validated_data["appointment"]
 
         if appointment.doctor.user_profile.user != self.request.user:
-
             raise PermissionDenied(
                 "You can only create a consultation for your own appointment."
             )

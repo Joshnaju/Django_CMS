@@ -135,7 +135,13 @@ class LabOrder(models.Model):
         db_table = "lab_order"
 
     def __str__(self):
+        lab_name = (
+            self.lab_test.name
+            if self.lab_test
+            else self.lab_test_name
+        )
+
         return (
-            f"{self.lab_test.name} - "
+            f"{lab_name} - "
             f"{self.consultation.appointment.patient.patient_id}"
         )

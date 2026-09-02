@@ -4,8 +4,8 @@ from rest_framework import serializers
 
 from .models import Patient, Appointment, ConsultationBill
 from .scheduling import get_india_now, is_valid_appointment_slot
-
-
+from datetime import date
+from rest_framework import serializers
 # =========================================================
 # PATIENT SERIALIZER
 # =========================================================
@@ -313,10 +313,65 @@ class DoctorAppointmentSerializer(serializers.ModelSerializer):
         read_only=True
     )
 
-    doctor_name = serializers.CharField(
-        source="doctor.user_profile.name",
+    patient_age = serializers.SerializerMethodField()
+
+    patient_gender = serializers.CharField(
+        source="patient.gender",
         read_only=True
     )
+
+    patient_place = serializers.CharField(
+        source="patient.address",
+        read_only=True
+    )
+
+    patient_mobile = serializers.CharField(
+        source="patient.mobile_number",
+        read_only=True
+    )
+
+    patient_email = serializers.CharField(
+        source="patient.email",
+        read_only=True
+    )
+
+    patient_blood_group = serializers.CharField(
+        source="patient.blood_group",
+        read_only=True
+    )
+
+    doctor_name = serializers.CharField(
+        source="doctor.user_profile.name",
+         read_only=True
+    )
+    
+    def get_patient_age(self, obj):
+        dob = obj.patient.date_of_birth
+
+        if not dob:
+            return None
+
+        today = date.today()
+
+        age = today.year - dob.year
+
+        if (today.month, today.day) < (dob.month, dob.day):
+            age -= 1
+
+        if age >= 1:
+            return f"{age} year(s)"
+
+        months = (today.year - dob.year) * 12 + (today.month - dob.month)
+
+        if today.day < dob.day:
+            months -= 1
+
+        if months >= 1:
+            return f"{months} month(s)"
+
+        days = (today - dob).days
+
+        return f"{days} day(s)"
 
     class Meta:
         model = Appointment
@@ -324,22 +379,18 @@ class DoctorAppointmentSerializer(serializers.ModelSerializer):
             "id",
             "patient_id",
             "patient_name",
+            "patient_age",
+            "patient_gender",
+            "patient_place",
+            "patient_mobile",
+            "patient_email",
+            "patient_blood_group",
             "doctor_name",
             "appointment_type",
             "appointment_date",
             "appointment_time",
             "token_number",
             "status",
-            "created_at",
-            "updated_at",
-        ]
-
-        read_only_fields = [
-            "id",
-            "patient_id",
-            "patient_name",
-            "doctor_name",
-            "token_number",
             "created_at",
             "updated_at",
         ]
