@@ -3,6 +3,7 @@ from datetime import date, timedelta
 from rest_framework import serializers
 
 from .models import Patient, Appointment, ConsultationBill
+from .scheduling import get_india_now, is_valid_appointment_slot
 
 
 # =========================================================
@@ -28,7 +29,10 @@ class PatientSerializer(serializers.ModelSerializer):
                 "Patient name must contain at least 3 characters."
             )
 
-        if not all(char.isalpha() or char.isspace() for char in value):
+        if not all(
+            char.isalpha() or char.isspace()
+            for char in value
+        ):
             raise serializers.ValidationError(
                 "Patient name must contain only letters and spaces."
             )
@@ -98,8 +102,6 @@ class PatientSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, attrs):
-        # Duplicate check only during NEW patient registration.
-        # Edit / Disable / Enable will not be blocked.
         if self.instance is None:
             patient_name = attrs.get("patient_name")
             date_of_birth = attrs.get("date_of_birth")
@@ -128,6 +130,16 @@ class PatientSerializer(serializers.ModelSerializer):
 
 class AppointmentSerializer(serializers.ModelSerializer):
 
+    patient_name = serializers.CharField(
+        source="patient.patient_name",
+        read_only=True,
+    )
+
+    doctor_name = serializers.CharField(
+        source="doctor.user_profile.name",
+        read_only=True,
+    )
+
     class Meta:
         model = Appointment
         fields = "__all__"
@@ -138,6 +150,8 @@ class AppointmentSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, attrs):
+        today = get_india_now().date()
+
         patient = attrs.get(
             "patient",
             getattr(self.instance, "patient", None),
@@ -163,39 +177,40 @@ class AppointmentSerializer(serializers.ModelSerializer):
             getattr(self.instance, "appointment_time", None),
         )
 
-        # Patient must be active
         if patient and not patient.is_active:
             raise serializers.ValidationError(
                 "Cannot create an appointment for an inactive patient."
             )
 
-        # Appointment cannot be in the past
-        if appointment_date and appointment_date < date.today():
+        if appointment_date and appointment_date < today:
             raise serializers.ValidationError(
                 "Appointment date cannot be in the past."
             )
 
-        # Walk-in must be today
         if (
             appointment_type == "WALK_IN"
             and appointment_date
-            and appointment_date != date.today()
+            and appointment_date != today
         ):
             raise serializers.ValidationError(
                 "Walk-in appointments must be booked for today."
             )
 
-        # Prior booking must be at least 2 days in advance
         if (
             appointment_type == "PRIOR_BOOKING"
             and appointment_date
-            and appointment_date < date.today() + timedelta(days=2)
         ):
-            raise serializers.ValidationError(
-                "Prior booking must be made at least 2 days in advance."
-            )
+            tomorrow = today + timedelta(days=1)
+            day_after_tomorrow = today + timedelta(days=2)
 
-        # Prevent duplicate doctor/date/time slot
+            if appointment_date not in [
+                tomorrow,
+                day_after_tomorrow,
+            ]:
+                raise serializers.ValidationError(
+                    "Prior booking can only be made for the next 2 days."
+                )
+
         if doctor and appointment_date and appointment_time:
             duplicate_slot = Appointment.objects.filter(
                 doctor=doctor,
@@ -211,6 +226,21 @@ class AppointmentSerializer(serializers.ModelSerializer):
             if duplicate_slot.exists():
                 raise serializers.ValidationError(
                     "This doctor already has an appointment at this date and time."
+                )
+
+        if (
+            self.instance is None
+            and doctor
+            and appointment_date
+            and appointment_time
+        ):
+            if not is_valid_appointment_slot(
+                doctor,
+                appointment_date,
+                appointment_time,
+            ):
+                raise serializers.ValidationError(
+                    "Please select the next available appointment time slot."
                 )
 
         return attrs
