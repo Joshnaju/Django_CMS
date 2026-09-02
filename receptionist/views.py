@@ -79,7 +79,8 @@ class DoctorAppointmentViewSet(viewsets.ReadOnlyModelViewSet):
 
 
     def get_queryset(self):
-        return Appointment.objects.filter(
+
+        queryset = Appointment.objects.filter(
             doctor__user_profile__user=self.request.user
         ).select_related(
             "patient",
@@ -89,36 +90,21 @@ class DoctorAppointmentViewSet(viewsets.ReadOnlyModelViewSet):
             "appointment_date",
             "appointment_time",
         )
-    
-    @action(detail=False, methods=["get"])
-    def today(self, request):
 
-        today = timezone.localdate()
+        # Date filter
+        selected_date = self.request.query_params.get("date")
 
-        appointments = self.get_queryset().filter(
-            appointment_date=today
-        )
+        if selected_date:
+            queryset = queryset.filter(
+                appointment_date=selected_date
+            )
 
-        serializer = self.get_serializer(
-            appointments,
-            many=True
-        )
+        # Status filter
+        status = self.request.query_params.get("status")
 
-        return Response(serializer.data)
+        if status:
+            queryset = queryset.filter(
+                status=status
+            )
 
-    @action(detail=False, methods=["get"])
-    def upcoming(self, request):
-
-        today = timezone.localdate()
-
-        appointments = self.get_queryset().filter(
-            appointment_date__gte=today,
-            status="SCHEDULED",
-        )
-
-        serializer = self.get_serializer(
-            appointments,
-            many=True
-        )
-
-        return Response(serializer.data)
+        return queryset
