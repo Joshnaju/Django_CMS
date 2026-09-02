@@ -14,6 +14,8 @@ class IsReceptionist(BasePermission):
 
 
 class IsDoctor(BasePermission):
+    message = "Only doctor is allowed to access this resource."
+
     def has_permission(self, request, view):
         return request.user.is_authenticated and request.user.profile.role == "DOCTOR"
 

@@ -89,4 +89,7 @@ class DoctorConsultationViewSet(
                 "You can only create a consultation for your own appointment."
             )
 
-        serializer.save()
+        consultation = serializer.save()
+
+        appointment.status = "COMPLETED"
+        appointment.save(update_fields=["status"])
