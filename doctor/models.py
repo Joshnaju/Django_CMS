@@ -115,7 +115,15 @@ class LabOrder(models.Model):
     lab_test = models.ForeignKey(
         "lab_master.LabTest",
         on_delete=models.PROTECT,
-        related_name="lab_orders"
+        related_name="lab_orders",
+        null=True,      
+        blank=True 
+    )
+
+    lab_test_name = models.CharField(
+        max_length=150,
+        blank=True,
+        null=True
     )
 
     instructions = models.TextField(
