@@ -1,6 +1,5 @@
-from datetime import date, timezone
+from datetime import date
 
-from rest_framework.decorators import action
 from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -25,6 +24,10 @@ from .permissions import IsReceptionist
 from .scheduling import get_next_available_slot
 
 
+# =========================================================
+# PATIENT MANAGEMENT
+# =========================================================
+
 class PatientViewSet(viewsets.ModelViewSet):
     queryset = Patient.objects.all()
     serializer_class = PatientSerializer
@@ -40,22 +43,40 @@ class PatientViewSet(viewsets.ModelViewSet):
             "patient_id"
         )
 
+        patient_name = self.request.query_params.get(
+            "patient_name"
+        )
+
         mobile_number = self.request.query_params.get(
             "mobile_number"
         )
 
+        # Search by unique Patient ID
         if patient_id:
             queryset = queryset.filter(
-                patient_id__iexact=patient_id
+                patient_id__iexact=patient_id.strip()
             )
 
+        # Search by patient name
+        # Returns all matching patients
+        if patient_name:
+            queryset = queryset.filter(
+                patient_name__icontains=patient_name.strip()
+            )
+
+        # Search by mobile number
+        # Returns all patients with the same phone number
         if mobile_number:
             queryset = queryset.filter(
-                mobile_number=mobile_number
+                mobile_number=mobile_number.strip()
             )
 
         return queryset.order_by("patient_id")
 
+
+# =========================================================
+# APPOINTMENT MANAGEMENT
+# =========================================================
 
 class AppointmentViewSet(viewsets.ModelViewSet):
     queryset = Appointment.objects.all()
@@ -83,6 +104,10 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             "token_number",
         )
 
+
+# =========================================================
+# CONSULTATION BILL MANAGEMENT
+# =========================================================
 
 class ConsultationBillViewSet(viewsets.ModelViewSet):
     queryset = ConsultationBill.objects.all()
@@ -208,6 +233,7 @@ class NextAvailableSlotViewSet(viewsets.ViewSet):
             }
         )
 
+
 class FeePreviewViewSet(viewsets.ViewSet):
     permission_classes = [
         IsAuthenticated,
@@ -290,6 +316,7 @@ class FeePreviewViewSet(viewsets.ViewSet):
                 ),
             }
         )
+
 
 class PaidAppointmentBookingViewSet(
     viewsets.ViewSet
@@ -378,3 +405,4 @@ class DoctorAppointmentViewSet(
         return queryset
 
 
+    
