@@ -95,6 +95,18 @@ class ConsultationSerializer(serializers.ModelSerializer):
         read_only=True
     )
 
+    patient_age = serializers.SerializerMethodField()
+
+    patient_gender = serializers.CharField(
+        source="appointment.patient.gender",
+        read_only=True
+    )
+
+    patient_place = serializers.CharField(
+        source="appointment.patient.address",
+        read_only=True
+    )
+
     medicine_prescriptions = MedicinePrescriptionSerializer(
         many=True,
         required=False
@@ -105,16 +117,8 @@ class ConsultationSerializer(serializers.ModelSerializer):
         required=False
     )
 
-    patient_age = serializers.SerializerMethodField()
-    patient_gender = serializers.CharField(
-        source="appointment.patient.gender",
-        read_only=True
-    )
+    medical_history = serializers.SerializerMethodField()
 
-    patient_place = serializers.CharField(
-        source="appointment.patient.address",
-        read_only=True
-    )
     class Meta:
         model = Consultation
 
@@ -123,9 +127,9 @@ class ConsultationSerializer(serializers.ModelSerializer):
             "appointment",
             "patient_id",
             "patient_name",
-            "patient_age",       
-            "patient_gender",  
-            "patient_place", 
+            "patient_age",
+            "patient_gender",
+            "patient_place",
             "symptoms",
             "diagnosis",
             "notes",
@@ -133,39 +137,8 @@ class ConsultationSerializer(serializers.ModelSerializer):
             "updated_at",
             "medicine_prescriptions",
             "lab_orders",
+            "medical_history",
         ]
-
-    def create(self, validated_data):
-
-        medicine_data = validated_data.pop(
-            "medicine_prescriptions",
-            []
-        )
-
-        lab_data = validated_data.pop(
-            "lab_orders",
-            []
-        )
-
-        consultation = Consultation.objects.create(
-            **validated_data
-        )
-
-        for medicine in medicine_data:
-
-            MedicinePrescription.objects.create(
-                consultation=consultation,
-                **medicine
-            )
-
-        for lab in lab_data:
-
-            LabOrder.objects.create(
-                consultation=consultation,
-                **lab
-            )
-
-        return consultation
 
     def get_patient_age(self, obj):
 
@@ -184,3 +157,124 @@ class ConsultationSerializer(serializers.ModelSerializer):
                 < (dob.month, dob.day)
             )
         )
+    
+    def get_medical_history(self, obj):
+
+        patient = obj.appointment.patient
+
+        previous_consultations = Consultation.objects.filter(
+            appointment__patient=patient
+        ).exclude(
+            id=obj.id
+        ).prefetch_related(
+            "medicine_prescriptions",
+            "medicine_prescriptions__medicine",
+            "lab_orders",
+            "lab_orders__lab_test",
+        ).order_by(
+            "-consultation_date"
+        )
+
+        return ConsultationHistorySerializer(
+            previous_consultations,
+            many=True
+        ).data
+
+
+    def create(self, validated_data):
+
+        # -----------------------------------------
+        # Get nested medicine data
+        # -----------------------------------------
+
+        medicine_data = validated_data.pop(
+            "medicine_prescriptions",
+            []
+        )
+
+        # -----------------------------------------
+        # Get nested lab data
+        # -----------------------------------------
+
+        lab_data = validated_data.pop(
+            "lab_orders",
+            []
+        )
+
+        # -----------------------------------------
+        # Create Consultation
+        # -----------------------------------------
+
+        consultation = Consultation.objects.create(
+            **validated_data
+        )
+
+        # -----------------------------------------
+        # Create Medicine Prescriptions
+        # -----------------------------------------
+
+        for medicine_data_item in medicine_data:
+
+            medicine_obj = medicine_data_item.get("medicine")
+
+            # Available medicine
+            if medicine_obj:
+                medicine_data_item["medicine_name"] = medicine_obj.name
+
+            MedicinePrescription.objects.create(
+                consultation=consultation,
+                **medicine_data_item
+            )
+
+        # -----------------------------------------
+        # Create Lab Orders
+        # -----------------------------------------
+
+        for lab_data_item in lab_data:
+
+            lab_test_obj = lab_data_item.get("lab_test")
+
+            # Available lab test
+            if lab_test_obj:
+                lab_data_item["lab_test_name"] = lab_test_obj.name
+
+            LabOrder.objects.create(
+                consultation=consultation,
+                **lab_data_item
+            )
+
+        return consultation
+class ConsultationHistorySerializer(serializers.ModelSerializer):
+    medicine_prescriptions = MedicinePrescriptionSerializer(
+        many=True,
+        read_only=True
+    )
+
+    lab_orders = LabOrderSerializer(
+        many=True,
+        read_only=True
+    )
+
+    doctor_name = serializers.CharField(
+        source="appointment.doctor.user_profile.name",
+        read_only=True
+    )
+
+    department_name = serializers.CharField(
+        source="appointment.doctor.department.name",
+        read_only=True
+    )
+    class Meta:
+        model = Consultation
+
+        fields = [
+            "id",
+            "doctor_name",
+            "department_name",
+            "symptoms",
+            "diagnosis",
+            "notes",
+            "consultation_date",
+            "medicine_prescriptions",
+            "lab_orders",
+        ]
