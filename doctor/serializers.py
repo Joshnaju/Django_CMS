@@ -1,18 +1,20 @@
+from datetime import date
+
 from rest_framework import serializers
 
 from doctor.models import Consultation, LabOrder, MedicinePrescription
 from receptionist.models import Patient
 from django.utils import timezone
-
-
 class DoctorPatientSerializer(serializers.ModelSerializer):
+
+    age = serializers.SerializerMethodField()
     class Meta:
         model = Patient
         fields = [
             "id",
             "patient_id",
             "patient_name",
-            "date_of_birth",
+            "age",
             "gender",
             "address",
             "mobile_number",
@@ -21,6 +23,33 @@ class DoctorPatientSerializer(serializers.ModelSerializer):
             "is_active",
         ]
 
+    def get_age(self, obj):
+        dob = obj.date_of_birth
+
+        if not dob:
+            return None
+
+        today = date.today()
+
+        age = today.year - dob.year
+
+        if (today.month, today.day) < (dob.month, dob.day):
+            age -= 1
+
+        if age >= 1:
+            return f"{age} year(s)"
+
+        months = (today.year - dob.year) * 12 + (today.month - dob.month)
+
+        if today.day < dob.day:
+            months -= 1
+
+        if months >= 1:
+            return f"{months} month(s)"
+
+        days = (today - dob).days
+
+        return f"{days} day(s)"
     
 class MedicinePrescriptionSerializer(serializers.ModelSerializer):
 
@@ -264,6 +293,11 @@ class ConsultationHistorySerializer(serializers.ModelSerializer):
         source="appointment.doctor.department.name",
         read_only=True
     )
+
+    appointment = serializers.IntegerField(
+    source="appointment.id",
+    read_only=True
+    )
     class Meta:
         model = Consultation
 
@@ -271,6 +305,7 @@ class ConsultationHistorySerializer(serializers.ModelSerializer):
             "id",
             "doctor_name",
             "department_name",
+            "appointment",
             "symptoms",
             "diagnosis",
             "notes",
@@ -278,3 +313,70 @@ class ConsultationHistorySerializer(serializers.ModelSerializer):
             "medicine_prescriptions",
             "lab_orders",
         ]
+class DoctorPatientDetailSerializer(serializers.ModelSerializer):
+
+    age = serializers.SerializerMethodField()
+    consultations = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Patient
+        fields = [
+            "id",
+            "patient_id",
+            "patient_name",
+            "age",
+            "gender",
+            "address",
+            "mobile_number",
+            "email",
+            "blood_group",
+            "is_active",
+            "consultations",
+        ]
+
+    def get_age(self, obj):
+        dob = obj.date_of_birth
+
+        if not dob:
+            return None
+
+        today = date.today()
+
+        age = today.year - dob.year
+
+        if (today.month, today.day) < (dob.month, dob.day):
+            age -= 1
+
+        if age >= 1:
+            return f"{age} year(s)"
+
+        months = (today.year - dob.year) * 12 + (today.month - dob.month)
+
+        if today.day < dob.day:
+            months -= 1
+
+        if months >= 1:
+            return f"{months} month(s)"
+
+        days = (today - dob).days
+
+        return f"{days} day(s)"
+
+    def get_consultations(self, obj):
+        consultations = Consultation.objects.filter(
+            appointment__patient=obj
+        ).select_related(
+            "appointment",
+            "appointment__doctor",
+        ).prefetch_related(
+            "medicine_prescriptions",
+            "medicine_prescriptions__medicine",
+            "lab_orders",
+            "lab_orders__lab_test",
+        ).order_by("-consultation_date")
+
+        return ConsultationHistorySerializer(
+            consultations,
+            many=True,
+            context=self.context
+        ).data
