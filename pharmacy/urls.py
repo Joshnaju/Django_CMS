@@ -7,7 +7,10 @@ from .views import (
     medicine_details,
     prescription_search,
     create_pharmacy_bill,
-    pay_pharmacy_bill
+    pay_pharmacy_bill,
+    pharmacy_sales_report,
+    low_stock_alert,
+    search_medicine
 )
 
 
@@ -21,6 +24,12 @@ router.register(
 
 
 urlpatterns = [
+    path(
+        "medicine/search/",
+        search_medicine,
+        name="search-medicine"
+    ),
+
     path(
         "medicine/<int:medicine_id>/",
         medicine_details,
@@ -43,6 +52,18 @@ urlpatterns = [
         "bills/<int:bill_id>/pay/",
         pay_pharmacy_bill,
         name="pay-pharmacy-bill"
+    ),
+
+    path(
+        "reports/sales/",
+        pharmacy_sales_report,
+        name="pharmacy-sales-report"
+    ),
+
+    path(
+        "alerts/low-stock/",
+        low_stock_alert,
+        name="low-stock-alert"
     ),
 ]
 

@@ -43,6 +43,7 @@ class MedicineInventorySerializer(serializers.ModelSerializer):
 
         fields = [
             "id",
+
             "medicine",
             "medicine_name",
             "generic_name",
@@ -50,7 +51,12 @@ class MedicineInventorySerializer(serializers.ModelSerializer):
             "strength",
             "manufacturer",
             "price",
+
             "stock",
+
+            "min_stock",
+            "max_stock",
+
             "batch_number",
             "manufacturing_date",
             "expiry_date",
@@ -61,30 +67,56 @@ class MedicineInventorySerializer(serializers.ModelSerializer):
             "medicine"
         ]
 
+    # ---------------- STOCK VALIDATION ----------------
 
-    # Stock validation
     def validate_stock(self, value):
 
         if value < 0:
+
             raise serializers.ValidationError(
                 "Stock cannot be negative."
             )
 
         return value
 
+    # ---------------- MIN STOCK VALIDATION ----------------
 
-    # Number of units validation
+    def validate_min_stock(self, value):
+
+        if value < 0:
+
+            raise serializers.ValidationError(
+                "Minimum stock cannot be negative."
+            )
+
+        return value
+
+    # ---------------- MAX STOCK VALIDATION ----------------
+
+    def validate_max_stock(self, value):
+
+        if value < 0:
+
+            raise serializers.ValidationError(
+                "Maximum stock cannot be negative."
+            )
+
+        return value
+
+    # ---------------- NUMBER OF UNITS VALIDATION ----------------
+
     def validate_number_of_units(self, value):
 
         if value <= 0:
+
             raise serializers.ValidationError(
                 "Number of units must be greater than zero."
             )
 
         return value
 
+    # ---------------- DATE AND STOCK VALIDATION ----------------
 
-    # Date validation
     def validate(self, data):
 
         manufacturing_date = data.get(
@@ -95,19 +127,43 @@ class MedicineInventorySerializer(serializers.ModelSerializer):
             "expiry_date"
         )
 
-        # For PATCH/PUT of existing inventory,
-        # use existing values when a date is not sent.
+        min_stock = data.get(
+            "min_stock"
+        )
+
+        max_stock = data.get(
+            "max_stock"
+        )
+
+        # ---------------- PATCH / PUT ----------------
+
         if self.instance:
 
             if manufacturing_date is None:
+
                 manufacturing_date = (
                     self.instance.manufacturing_date
                 )
 
             if expiry_date is None:
+
                 expiry_date = (
                     self.instance.expiry_date
                 )
+
+            if min_stock is None:
+
+                min_stock = (
+                    self.instance.min_stock
+                )
+
+            if max_stock is None:
+
+                max_stock = (
+                    self.instance.max_stock
+                )
+
+        # ---------------- DATE VALIDATION ----------------
 
         if (
             manufacturing_date
@@ -116,8 +172,25 @@ class MedicineInventorySerializer(serializers.ModelSerializer):
         ):
 
             raise serializers.ValidationError({
+
                 "expiry_date":
                 "Expiry date must be after manufacturing date."
+
+            })
+
+        # ---------------- MIN/MAX STOCK VALIDATION ----------------
+
+        if (
+            min_stock is not None
+            and max_stock is not None
+            and min_stock > max_stock
+        ):
+
+            raise serializers.ValidationError({
+
+                "max_stock":
+                "Maximum stock must be greater than or equal to minimum stock."
+
             })
 
         return data
@@ -172,10 +245,33 @@ class PharmacistPrescriptionSerializer(serializers.ModelSerializer):
 
 class PharmacyBillItemSerializer(serializers.ModelSerializer):
 
+    # ---------------- SERIAL NUMBER ----------------
+
+    serial_number = serializers.SerializerMethodField()
+
+    # ---------------- MEDICINE DETAILS ----------------
+
+    medicine_id = serializers.IntegerField(
+        source="medicine.id",
+        read_only=True
+    )
+
     medicine_name = serializers.CharField(
         source="medicine.name",
         read_only=True
     )
+
+    # ---------------- PRESCRIPTION DETAILS ----------------
+
+    doctor_name = serializers.CharField(
+        source=(
+            "prescription.consultation.appointment."
+            "doctor.user_profile.name"
+        ),
+        read_only=True
+    )
+
+    prescription_date = serializers.SerializerMethodField()
 
     class Meta:
 
@@ -183,22 +279,54 @@ class PharmacyBillItemSerializer(serializers.ModelSerializer):
 
         fields = [
             "id",
+
+            "serial_number",
+
             "prescription",
-            "medicine",
+
+            "doctor_name",
+            "prescription_date",
+
+            "medicine_id",
             "medicine_name",
+
             "quantity",
             "unit_price",
             "total_price",
         ]
 
         read_only_fields = [
-            "medicine",
+            "medicine_id",
+            "medicine_name",
             "unit_price",
             "total_price",
         ]
 
+    # ---------------- SERIAL NUMBER ----------------
+
+    def get_serial_number(self, obj):
+
+        bill_items = list(
+            obj.pharmacy_bill.items.order_by("id")
+        )
+
+        return bill_items.index(obj) + 1
+
+    # ---------------- PRESCRIPTION DATE ----------------
+
+    def get_prescription_date(self, obj):
+
+        return obj.prescription.consultation.consultation_date
+
+
 
 class PharmacyBillSerializer(serializers.ModelSerializer):
+
+    # ---------------- BILL NUMBER ----------------
+
+    bill_number = serializers.SerializerMethodField()
+
+    # ---------------- PATIENT DETAILS ----------------
 
     patient_name = serializers.CharField(
         source="patient.patient_name",
@@ -209,6 +337,15 @@ class PharmacyBillSerializer(serializers.ModelSerializer):
         source="patient.patient_id",
         read_only=True
     )
+
+    # ---------------- ISSUE DATE ----------------
+
+    issue_date = serializers.DateTimeField(
+        source="created_at",
+        read_only=True
+    )
+
+    # ---------------- ITEMS ----------------
 
     items = PharmacyBillItemSerializer(
         many=True,
@@ -221,16 +358,36 @@ class PharmacyBillSerializer(serializers.ModelSerializer):
 
         fields = [
             "id",
+
+            "bill_number",
+
             "patient",
             "patient_id",
             "patient_name",
+
+            "subtotal",
+            "gst_amount",
             "total_amount",
+            "amount_paid",
+
             "payment_status",
-            "created_at",
+
+            "issue_date",
+
             "items",
         ]
 
         read_only_fields = [
+            "subtotal",
+            "gst_amount",
             "total_amount",
-            "created_at",
+            "amount_paid",
+            "payment_status",
+            "issue_date",
         ]
+
+    # ---------------- BILL NUMBER ----------------
+
+    def get_bill_number(self, obj):
+
+        return f"PHARM-{obj.id:06d}"

@@ -12,7 +12,19 @@ class MedicineInventory(models.Model):
         related_name="inventory"
     )
 
-    stock = models.PositiveIntegerField(default=0)
+    stock = models.PositiveIntegerField(
+        default=0
+    )
+
+    # NEW FIELD
+    min_stock = models.PositiveIntegerField(
+        default=0
+    )
+
+    # NEW FIELD
+    max_stock = models.PositiveIntegerField(
+        default=0
+    )
 
     batch_number = models.CharField(
         max_length=100
@@ -29,7 +41,6 @@ class MedicineInventory(models.Model):
 
     def __str__(self):
         return f"{self.medicine.name} - {self.batch_number}"
-
 
 # ==============================
 # PHARMACY BILL
@@ -48,11 +59,39 @@ class PharmacyBill(models.Model):
         related_name="pharmacy_bills"
     )
 
+    # ---------------- SUBTOTAL ----------------
+
+    subtotal = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0
+    )
+
+    # ---------------- GST ----------------
+
+    gst_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0
+    )
+
+    # ---------------- GRAND TOTAL ----------------
+
     total_amount = models.DecimalField(
         max_digits=10,
         decimal_places=2,
         default=0
     )
+
+    # ---------------- AMOUNT PAID ----------------
+
+    amount_paid = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0
+    )
+
+    # ---------------- PAYMENT STATUS ----------------
 
     payment_status = models.CharField(
         max_length=20,
@@ -60,16 +99,22 @@ class PharmacyBill(models.Model):
         default="PENDING"
     )
 
+    # ---------------- ISSUE DATE ----------------
+
     created_at = models.DateTimeField(
         auto_now_add=True
     )
 
     class Meta:
+
         db_table = "pharmacy_bill"
 
     def __str__(self):
-        return f"Pharmacy Bill {self.id} - {self.patient.patient_name}"
 
+        return (
+            f"Pharmacy Bill {self.id} - "
+            f"{self.patient.patient_name}"
+        )
 
 # ==============================
 # PHARMACY BILL ITEM
