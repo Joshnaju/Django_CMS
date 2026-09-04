@@ -9,8 +9,10 @@ from .views import (
     DepartmentViewSet,
     ReceptionistDoctorViewSet,
     NextAvailableSlotViewSet,
+    AvailableSlotsViewSet,
     FeePreviewViewSet,
     PaidAppointmentBookingViewSet,
+    ReceptionistDashboardViewSet,
 )
 
 
@@ -29,6 +31,7 @@ router.register(
 router.register(
     "consultation-bills",
     ConsultationBillViewSet,
+    basename="consultation-bills",
 )
 
 router.register(
@@ -50,6 +53,12 @@ router.register(
 )
 
 router.register(
+    "available-slots",
+    AvailableSlotsViewSet,
+    basename="available-slots",
+)
+
+router.register(
     "fee-preview",
     FeePreviewViewSet,
     basename="fee-preview",
@@ -61,9 +70,13 @@ router.register(
     basename="paid-booking",
 )
 
+router.register(
+    "dashboard",
+    ReceptionistDashboardViewSet,
+    basename="receptionist-dashboard",
+)
+
 
 urlpatterns = [
     path("", include(router.urls)),
 ]
-
-

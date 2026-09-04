@@ -3,9 +3,13 @@ from datetime import date, timedelta
 from rest_framework import serializers
 
 from .models import Patient, Appointment, ConsultationBill
-from .scheduling import get_india_now, is_valid_appointment_slot
-from datetime import date
-from rest_framework import serializers
+from .scheduling import (
+    get_india_now,
+    is_available_slot,
+    is_next_available_slot,
+)
+
+
 # =========================================================
 # PATIENT SERIALIZER
 # =========================================================
@@ -130,6 +134,13 @@ class PatientSerializer(serializers.ModelSerializer):
 
 class AppointmentSerializer(serializers.ModelSerializer):
 
+    appointment_display_id = serializers.SerializerMethodField()
+
+    patient_id = serializers.CharField(
+        source="patient.patient_id",
+        read_only=True,
+    )
+
     patient_name = serializers.CharField(
         source="patient.patient_name",
         read_only=True,
@@ -140,6 +151,12 @@ class AppointmentSerializer(serializers.ModelSerializer):
         read_only=True,
     )
 
+    department_name = serializers.CharField(
+        source="doctor.department.name",
+        read_only=True,
+        allow_null=True,
+    )
+
     class Meta:
         model = Appointment
         fields = "__all__"
@@ -148,6 +165,9 @@ class AppointmentSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+
+    def get_appointment_display_id(self, obj):
+        return f"APT{obj.id:04d}"
 
     def validate(self, attrs):
         today = get_india_now().date()
@@ -216,6 +236,8 @@ class AppointmentSerializer(serializers.ModelSerializer):
                 doctor=doctor,
                 appointment_date=appointment_date,
                 appointment_time=appointment_time,
+            ).exclude(
+                status="CANCELLED"
             )
 
             if self.instance:
@@ -229,19 +251,60 @@ class AppointmentSerializer(serializers.ModelSerializer):
                 )
 
         if (
-            self.instance is None
-            and doctor
+            doctor
             and appointment_date
             and appointment_time
         ):
-            if not is_valid_appointment_slot(
-                doctor,
-                appointment_date,
-                appointment_time,
-            ):
-                raise serializers.ValidationError(
-                    "Please select the next available appointment time slot."
+            if self.instance is None:
+                if appointment_type == "WALK_IN":
+                    valid_slot = is_next_available_slot(
+                        doctor,
+                        appointment_date,
+                        appointment_time,
+                    )
+
+                    if not valid_slot:
+                        raise serializers.ValidationError(
+                            "Walk-in appointment must use the next available time slot."
+                        )
+
+                elif appointment_type == "PRIOR_BOOKING":
+                    valid_slot = is_available_slot(
+                        doctor,
+                        appointment_date,
+                        appointment_time,
+                    )
+
+                    if not valid_slot:
+                        raise serializers.ValidationError(
+                            "Please select an available appointment time slot."
+                        )
+
+            else:
+                date_changed = (
+                    "appointment_date" in attrs
+                    and appointment_date
+                    != self.instance.appointment_date
                 )
+
+                time_changed = (
+                    "appointment_time" in attrs
+                    and appointment_time
+                    != self.instance.appointment_time
+                )
+
+                if date_changed or time_changed:
+                    valid_slot = is_available_slot(
+                        doctor,
+                        appointment_date,
+                        appointment_time,
+                        exclude_appointment=self.instance,
+                    )
+
+                    if not valid_slot:
+                        raise serializers.ValidationError(
+                            "Please select an available appointment time slot."
+                        )
 
         return attrs
 
@@ -252,15 +315,91 @@ class AppointmentSerializer(serializers.ModelSerializer):
 
 class ConsultationBillSerializer(serializers.ModelSerializer):
 
+    bill_display_id = serializers.SerializerMethodField()
+
+    appointment_display_id = serializers.SerializerMethodField()
+
+    patient_id = serializers.CharField(
+        source="appointment.patient.patient_id",
+        read_only=True,
+    )
+
+    patient_name = serializers.CharField(
+        source="appointment.patient.patient_name",
+        read_only=True,
+    )
+
+    doctor_name = serializers.CharField(
+        source="appointment.doctor.user_profile.name",
+        read_only=True,
+    )
+
+    department_name = serializers.CharField(
+        source="appointment.doctor.department.name",
+        read_only=True,
+        allow_null=True,
+    )
+
+    appointment_date = serializers.DateField(
+        source="appointment.appointment_date",
+        read_only=True,
+    )
+
+    appointment_time = serializers.TimeField(
+        source="appointment.appointment_time",
+        read_only=True,
+        format="%H:%M",
+    )
+
+    appointment_type = serializers.CharField(
+        source="appointment.appointment_type",
+        read_only=True,
+    )
+
+    token_number = serializers.IntegerField(
+        source="appointment.token_number",
+        read_only=True,
+    )
+
+    payment_status = serializers.SerializerMethodField()
+
     class Meta:
         model = ConsultationBill
-        fields = "__all__"
+        fields = [
+            "id",
+            "bill_display_id",
+            "appointment",
+            "appointment_display_id",
+            "patient_id",
+            "patient_name",
+            "doctor_name",
+            "department_name",
+            "appointment_date",
+            "appointment_time",
+            "appointment_type",
+            "token_number",
+            "payment_status",
+            "registration_fee",
+            "consultation_fee",
+            "total_amount",
+            "created_at",
+        ]
+
         read_only_fields = [
             "registration_fee",
             "consultation_fee",
             "total_amount",
             "created_at",
         ]
+
+    def get_bill_display_id(self, obj):
+        return f"CB{obj.id:04d}"
+
+    def get_appointment_display_id(self, obj):
+        return f"APT{obj.appointment.id:04d}"
+
+    def get_payment_status(self, obj):
+        return "PAID"
 
     def validate_appointment(self, appointment):
         if ConsultationBill.objects.filter(
@@ -342,9 +481,9 @@ class DoctorAppointmentSerializer(serializers.ModelSerializer):
 
     doctor_name = serializers.CharField(
         source="doctor.user_profile.name",
-         read_only=True
+        read_only=True
     )
-    
+
     def get_patient_age(self, obj):
         dob = obj.patient.date_of_birth
 
@@ -361,7 +500,10 @@ class DoctorAppointmentSerializer(serializers.ModelSerializer):
         if age >= 1:
             return f"{age} year(s)"
 
-        months = (today.year - dob.year) * 12 + (today.month - dob.month)
+        months = (
+            (today.year - dob.year) * 12
+            + (today.month - dob.month)
+        )
 
         if today.day < dob.day:
             months -= 1
