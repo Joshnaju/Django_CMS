@@ -14,9 +14,9 @@ WORK_END = time(18, 0)
 INDIA_TIMEZONE = ZoneInfo("Asia/Kolkata")
 
 BREAK_PERIODS = [
-    (time(11, 0), time(11, 15)),  # Morning break
-    (time(13, 0), time(14, 0)),   # Lunch break
-    (time(16, 0), time(16, 15)),  # Evening break
+    (time(11, 0), time(11, 15)),
+    (time(13, 0), time(14, 0)),
+    (time(16, 0), time(16, 15)),
 ]
 
 
@@ -62,18 +62,26 @@ def generate_all_slots():
 def get_available_slots(
     doctor,
     appointment_date,
+    exclude_appointment=None,
 ):
     all_slots = generate_all_slots()
 
+    booked_appointments = Appointment.objects.filter(
+        doctor=doctor,
+        appointment_date=appointment_date,
+    ).exclude(
+        status="CANCELLED"
+    )
+
+    # Used while editing an existing appointment.
+    # The appointment's own current slot must not block itself.
+    if exclude_appointment is not None:
+        booked_appointments = booked_appointments.exclude(
+            pk=exclude_appointment.pk
+        )
+
     booked_slots = set(
-        Appointment.objects.filter(
-            doctor=doctor,
-            appointment_date=appointment_date,
-        )
-        .exclude(
-            status="CANCELLED"
-        )
-        .values_list(
+        booked_appointments.values_list(
             "appointment_time",
             flat=True,
         )
@@ -88,8 +96,7 @@ def get_available_slots(
     india_now = get_india_now()
     india_today = india_now.date()
 
-    # For today's walk-in appointments,
-    # remove all time slots that have already passed.
+    # Remove already-passed slots for today's appointments.
     if appointment_date == india_today:
         current_time = india_now.time()
 
@@ -105,10 +112,12 @@ def get_available_slots(
 def get_next_available_slot(
     doctor,
     appointment_date,
+    exclude_appointment=None,
 ):
     available_slots = get_available_slots(
         doctor,
         appointment_date,
+        exclude_appointment=exclude_appointment,
     )
 
     if not available_slots:
@@ -117,14 +126,23 @@ def get_next_available_slot(
     return available_slots[0]
 
 
-def is_valid_appointment_slot(
+def is_next_available_slot(
     doctor,
     appointment_date,
     appointment_time,
+    exclude_appointment=None,
 ):
+    """
+    Used for WALK_IN appointments.
+
+    Walk-in appointments must always use the next available
+    appointment slot.
+    """
+
     next_slot = get_next_available_slot(
         doctor,
         appointment_date,
+        exclude_appointment=exclude_appointment,
     )
 
     if next_slot is None:
@@ -133,3 +151,36 @@ def is_valid_appointment_slot(
     return appointment_time == next_slot
 
 
+def is_available_slot(
+    doctor,
+    appointment_date,
+    appointment_time,
+    exclude_appointment=None,
+):
+    """
+    Used for PRIOR_BOOKING appointments and appointment editing.
+
+    The selected time may be any currently available valid slot.
+    """
+
+    available_slots = get_available_slots(
+        doctor,
+        appointment_date,
+        exclude_appointment=exclude_appointment,
+    )
+
+    return appointment_time in available_slots
+
+
+# Kept for compatibility with any existing receptionist code
+# that may still import this function.
+def is_valid_appointment_slot(
+    doctor,
+    appointment_date,
+    appointment_time,
+):
+    return is_next_available_slot(
+        doctor,
+        appointment_date,
+        appointment_time,
+    )
