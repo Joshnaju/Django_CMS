@@ -12,6 +12,7 @@ class MedicineSerializer(serializers.ModelSerializer):
             "generic_name",
             "dosage_form",
             "strength",
+            "strength_unit",
             "manufacturer",
             "price",
             "is_active",

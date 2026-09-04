@@ -1,5 +1,6 @@
 from django.contrib import admin
-from .models import Doctor
+
+from .models import Doctor, MedicinePrescription
 
 
 @admin.register(Doctor)
@@ -11,3 +12,6 @@ class DoctorAdmin(admin.ModelAdmin):
     )
 
     list_filter = ("department",)
+
+
+admin.site.register(MedicinePrescription)
