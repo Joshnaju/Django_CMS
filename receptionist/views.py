@@ -26,6 +26,7 @@ from .scheduling import (
     get_india_now,
     get_next_available_slot,
     get_available_slots,
+    WORK_END,
 )
 
 
@@ -180,13 +181,6 @@ class AppointmentViewSet(viewsets.ModelViewSet):
 
         # =================================================
         # APPOINTMENT LOG
-        # =================================================
-        #
-        # Appointment Log is NOT filtered using
-        # patient__is_active.
-        #
-        # Therefore records belonging to inactive patients
-        # are preserved.
         # =================================================
 
         elif view_type == "log":
@@ -492,11 +486,23 @@ class NextAvailableSlotViewSet(
         )
 
         if next_slot is None:
+            india_now = get_india_now()
+
+            if (
+                selected_date == india_now.date()
+                and india_now.time() >= WORK_END
+            ):
+                message = (
+                    "Today's consultation hours are over."
+                )
+            else:
+                message = (
+                    "All appointment slots are filled."
+                )
+
             return Response(
                 {
-                    "message": (
-                        "All appointment slots are filled."
-                    ),
+                    "message": message,
                     "next_slot": None,
                 }
             )
@@ -802,5 +808,3 @@ class DoctorAppointmentViewSet(
             )
 
         return queryset
-
-    
