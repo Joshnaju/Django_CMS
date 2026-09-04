@@ -63,9 +63,6 @@ class MedicineInventorySerializer(serializers.ModelSerializer):
             "number_of_units",
         ]
 
-        read_only_fields = [
-            "medicine"
-        ]
 
     # ---------------- STOCK VALIDATION ----------------
 
