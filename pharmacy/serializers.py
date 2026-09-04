@@ -215,9 +215,27 @@ class PharmacistPrescriptionSerializer(serializers.ModelSerializer):
 
     # ---------------- MEDICINE DETAILS ----------------
 
-    medicine_name = serializers.CharField(
-        source="medicine.name",
-        read_only=True
+    medicine_name = serializers.SerializerMethodField()
+
+    medicine_strength = serializers.CharField(
+        source="medicine.strength",
+        read_only=True,
+        allow_null=True,
+        default=None
+    )
+
+    medicine_strength_unit = serializers.CharField(
+        source="medicine.strength_unit",
+        read_only=True,
+        allow_null=True,
+        default=None
+    )
+
+    medicine_dosage_form = serializers.CharField(
+        source="medicine.dosage_form",
+        read_only=True,
+        allow_null=True,
+        default=None
     )
 
     class Meta:
@@ -225,20 +243,39 @@ class PharmacistPrescriptionSerializer(serializers.ModelSerializer):
         model = MedicinePrescription
 
         fields = [
+
             "id",
 
+            # Patient
             "patient_id",
             "patient_name",
+
+            # Doctor
             "doctor_name",
 
+            # Medicine
             "medicine",
             "medicine_name",
+            "medicine_strength",
+            "medicine_strength_unit",
+            "medicine_dosage_form",
 
-            "dosage",
+            # Prescription
             "frequency",
             "duration",
+            "duration_unit",
+            "quantity",
             "instructions",
         ]
+
+    # ---------------- MEDICINE NAME ----------------
+
+    def get_medicine_name(self, obj):
+
+        if obj.medicine:
+            return obj.medicine.name
+
+        return obj.medicine_name
 
 class PharmacyBillItemSerializer(serializers.ModelSerializer):
 
@@ -295,6 +332,7 @@ class PharmacyBillItemSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "medicine_id",
             "medicine_name",
+            "quantity",
             "unit_price",
             "total_price",
         ]
@@ -323,6 +361,7 @@ class PharmacyBillSerializer(serializers.ModelSerializer):
 
     bill_number = serializers.SerializerMethodField()
 
+
     # ---------------- PATIENT DETAILS ----------------
 
     patient_name = serializers.CharField(
@@ -335,12 +374,14 @@ class PharmacyBillSerializer(serializers.ModelSerializer):
         read_only=True
     )
 
+
     # ---------------- ISSUE DATE ----------------
 
     issue_date = serializers.DateTimeField(
         source="created_at",
         read_only=True
     )
+
 
     # ---------------- ITEMS ----------------
 
@@ -349,11 +390,13 @@ class PharmacyBillSerializer(serializers.ModelSerializer):
         read_only=True
     )
 
+
     class Meta:
 
         model = PharmacyBill
 
         fields = [
+
             "id",
 
             "bill_number",
@@ -375,6 +418,7 @@ class PharmacyBillSerializer(serializers.ModelSerializer):
         ]
 
         read_only_fields = [
+
             "subtotal",
             "gst_amount",
             "total_amount",
@@ -382,6 +426,7 @@ class PharmacyBillSerializer(serializers.ModelSerializer):
             "payment_status",
             "issue_date",
         ]
+
 
     # ---------------- BILL NUMBER ----------------
 
