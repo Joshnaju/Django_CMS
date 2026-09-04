@@ -59,30 +59,76 @@ class MedicinePrescriptionSerializer(serializers.ModelSerializer):
         allow_null=True
     )
 
+    medicine_strength = serializers.CharField(
+        source="medicine.strength",
+        read_only=True
+    )
+
+    medicine_strength_unit = serializers.CharField(
+        source="medicine.strength_unit",
+        read_only=True
+    )
+
+    medicine_dosage_form = serializers.CharField(
+        source="medicine.dosage_form",
+        read_only=True
+    )
+
     class Meta:
         model = MedicinePrescription
+
         fields = [
             "id",
             "medicine",
             "medicine_name",
-            "dosage",
+            "medicine_strength",
+            "medicine_strength_unit",
+            "medicine_dosage_form",
             "frequency",
             "duration",
+            "duration_unit",
+            "quantity",
             "instructions",
+        ]
+
+        read_only_fields = [
+            "id",
+            "quantity",
+            "medicine_strength",
+            "medicine_strength_unit",
+            "medicine_dosage_form",
         ]
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
 
-        # Available medicine → get name from Medicine table
+        # Medicine available in Medicine Master
         if instance.medicine:
             data["medicine_name"] = instance.medicine.name
 
-        # Not available → use database medicine_name
+        # Medicine not available in pharmacy
         else:
             data["medicine_name"] = instance.medicine_name
 
         return data
+
+    def validate(self, attrs):
+
+        medicine = attrs.get("medicine")
+        medicine_name = attrs.get("medicine_name")
+
+        # Neither selected nor manually entered
+        if not medicine and not medicine_name:
+            raise serializers.ValidationError(
+                "Please select a medicine or enter a medicine name."
+            )
+
+        # If Medicine Master medicine is selected,
+        # don't store a duplicate manual name.
+        if medicine:
+            attrs["medicine_name"] = None
+
+        return attrs
 
 class LabOrderSerializer(serializers.ModelSerializer):
 
@@ -246,12 +292,60 @@ class ConsultationSerializer(serializers.ModelSerializer):
 
             medicine_obj = medicine_data_item.get("medicine")
 
+            # -----------------------------------------
             # Available medicine
+            # -----------------------------------------
+
             if medicine_obj:
                 medicine_data_item["medicine_name"] = medicine_obj.name
 
+            # -----------------------------------------
+            # Calculate Quantity
+            # -----------------------------------------
+
+            frequency = medicine_data_item.get("frequency")
+            duration = medicine_data_item.get("duration")
+            duration_unit = medicine_data_item.get("duration_unit")
+
+            quantity = None
+
+            if frequency and duration:
+
+                try:
+                    # Example:
+                    # 1-0-1 = 2 tablets per day
+                    doses_per_day = sum(
+                        int(value)
+                        for value in frequency.split("-")
+                    )
+
+                    # Days
+                    if duration_unit == "DAYS":
+                        total_days = duration
+
+                    # Weeks
+                    elif duration_unit == "WEEKS":
+                        total_days = duration * 7
+
+                    # Months
+                    elif duration_unit == "MONTHS":
+                        total_days = duration * 30
+
+                    else:
+                        total_days = 0
+
+                    quantity = doses_per_day * total_days
+
+                except (ValueError, TypeError):
+                    quantity = None
+
+            # -----------------------------------------
+            # Save Prescription
+            # -----------------------------------------
+
             MedicinePrescription.objects.create(
                 consultation=consultation,
+                quantity=quantity,
                 **medicine_data_item
             )
 

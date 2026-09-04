@@ -69,8 +69,8 @@ class MedicinePrescription(models.Model):
         "medicine_master.Medicine",
         on_delete=models.PROTECT,
         related_name="medicine_prescriptions",
-        null=True,       
-        blank=True   
+        null=True,
+        blank=True
     )
 
     medicine_name = models.CharField(
@@ -79,16 +79,24 @@ class MedicinePrescription(models.Model):
         null=True
     )
 
-    dosage = models.CharField(
-        max_length=100
-    )
-
     frequency = models.CharField(
-        max_length=100
+        max_length=20
     )
 
-    duration = models.CharField(
-        max_length=100
+    duration = models.PositiveIntegerField()
+
+    duration_unit = models.CharField(
+        max_length=20,
+        choices=[
+            ("DAYS", "Days"),
+            ("WEEKS", "Weeks"),
+            ("MONTHS", "Months"),
+        ]
+    )
+
+    quantity = models.PositiveIntegerField(
+        null=True,
+        blank=True
     )
 
     instructions = models.TextField(
@@ -100,10 +108,7 @@ class MedicinePrescription(models.Model):
         db_table = "medicine_prescription"
 
     def __str__(self):
-        return (
-            f"{self.medicine.name if self.medicine else self.medicine_name} - "
-            f"{self.consultation.appointment.patient.patient_id}"
-            )
+        return self.medicine.name if self.medicine else self.medicine_name
 class LabOrder(models.Model):
 
     consultation = models.ForeignKey(
