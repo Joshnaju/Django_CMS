@@ -66,156 +66,96 @@ class MedicineInventoryViewSet(viewsets.ModelViewSet):
 def medicine_details(request, medicine_id):
 
     try:
-
-        medicine = Medicine.objects.get(
-            id=medicine_id
-        )
-
+        medicine = Medicine.objects.get(id=medicine_id)
     except Medicine.DoesNotExist:
-
         return Response(
-            {
-                "detail": "Medicine not found."
-            },
-            status=status.HTTP_404_NOT_FOUND
+            {"detail": "Medicine not found."},
+            status=404
         )
 
-    inventory = MedicineInventory.objects.filter(
-        medicine=medicine
-    ).first()
+    # Get existing inventory
+    inventory = (
+        MedicineInventory.objects
+        .filter(medicine=medicine)
+        .order_by("id")
+        .first()
+    )
 
-
-    # ========================================================
-    # GET
-    # ========================================================
-
+    # =========================
+    # GET MEDICINE DETAILS
+    # =========================
     if request.method == "GET":
 
         data = {
-
-            "medicine_id":
-            medicine.id,
-
-            "name":
-            medicine.name,
-
-            "generic_name":
-            medicine.generic_name,
-
-            "dosage_form":
-            medicine.dosage_form,
-
-            "strength":
-            medicine.strength,
-
-            "manufacturer":
-            medicine.manufacturer,
-
-            "price":
-            medicine.price,
+            "medicine_id": medicine.id,
+            "name": medicine.name,
+            "generic_name": medicine.generic_name,
+            "dosage_form": medicine.dosage_form,
+            "strength": medicine.strength,
+            "manufacturer": medicine.manufacturer,
+            "price": medicine.price,
         }
 
-
         if inventory:
-
-            data["inventory"] = (
-                MedicineInventorySerializer(
-                    inventory
-                ).data
-            )
-
+            data["inventory"] = MedicineInventorySerializer(
+                inventory
+            ).data
         else:
-
             data["inventory"] = None
-
 
         return Response(data)
 
-
-    # ========================================================
-    # UPDATE MEDICINE
-    # ========================================================
-
+    # =========================
+    # UPDATE MEDICINE DETAILS
+    # =========================
     medicine_fields = [
-
         "name",
-
         "generic_name",
-
         "dosage_form",
-
         "strength",
-
         "manufacturer",
-
-        "price",
-
+        "price"
     ]
 
-
     for field in medicine_fields:
-
         if field in request.data:
-
             setattr(
                 medicine,
                 field,
                 request.data[field]
             )
 
-
     medicine.save()
 
-
-    # ========================================================
+    # =========================
     # INVENTORY FIELDS
-    # ========================================================
-
+    # =========================
     inventory_fields = [
-
         "stock",
-
         "min_stock",
-
         "max_stock",
-
         "batch_number",
-
         "manufacturing_date",
-
         "expiry_date",
-
-        "number_of_units",
-
+        "number_of_units"
     ]
-
 
     inventory_data = {}
 
-
     for field in inventory_fields:
-
         if field in request.data:
+            inventory_data[field] = request.data[field]
 
-            inventory_data[field] = (
-                request.data[field]
-            )
-
-
-    # ========================================================
+    # =========================
     # UPDATE EXISTING INVENTORY
-    # ========================================================
-
+    # =========================
     if inventory:
 
         if inventory_data:
 
             serializer = MedicineInventorySerializer(
-
                 inventory,
-
                 data=inventory_data,
-
                 partial=True
             )
 
@@ -225,81 +165,59 @@ def medicine_details(request, medicine_id):
 
             serializer.save()
 
-
-    # ========================================================
+    # =========================
     # CREATE NEW INVENTORY
-    # ========================================================
-
+    # =========================
     else:
 
-        if inventory_data:
+        required_fields = [
+            "stock",
+            "min_stock",
+            "max_stock",
+            "batch_number",
+            "manufacturing_date",
+            "expiry_date",
+            "number_of_units"
+        ]
 
-            required_fields = [
+        missing_fields = [
+            field
+            for field in required_fields
+            if field not in inventory_data
+            or inventory_data[field] in ("", None)
+        ]
 
-                "stock",
+        if missing_fields:
 
-                "min_stock",
-
-                "max_stock",
-
-                "batch_number",
-
-                "manufacturing_date",
-
-                "expiry_date",
-
-                "number_of_units",
-
-            ]
-
-
-            missing_fields = []
-
-
-            for field in required_fields:
-
-                if field not in inventory_data:
-
-                    missing_fields.append(field)
-
-
-            if missing_fields:
-
-                return Response(
-
-                    {
-                        "detail":
-                        "All inventory fields are required when creating inventory.",
-
-                        "missing_fields":
-                        missing_fields,
-                    },
-
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-
-            serializer = MedicineInventorySerializer(
-                data=inventory_data
+            return Response(
+                {
+                    "detail": "All inventory fields are required when creating inventory.",
+                    "missing_fields": missing_fields
+                },
+                status=400
             )
 
-            serializer.is_valid(
-                raise_exception=True
-            )
+        # IMPORTANT:
+        # Add the medicine BEFORE serializer validation
+        create_data = {
+            **inventory_data,
+            "medicine": medicine.id
+        }
 
-            serializer.save(
-                medicine=medicine
-            )
+        serializer = MedicineInventorySerializer(
+            data=create_data
+        )
 
+        serializer.is_valid(
+            raise_exception=True
+        )
+
+        serializer.save()
 
     return Response(
-
         {
-            "message":
-            "Medicine details updated successfully.",
-
-            "medicine_id":
-            medicine.id,
+            "message": "Medicine details updated successfully.",
+            "medicine_id": medicine.id
         }
     )
 
